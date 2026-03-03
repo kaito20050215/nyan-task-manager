@@ -1,0 +1,10 @@
+CREATE DATABASE nyan_task;
+USE nyan_task;
+
+CREATE TABLE tasks (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    task VARCHAR(255) NOT NULL,
+    task_date DATE NOT NULL,
+    is_done TINYINT(1) NOT NULL DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
