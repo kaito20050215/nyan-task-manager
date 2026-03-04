@@ -1,15 +1,46 @@
 <?php
-/* ========= 接続 ========= */
+/* =============================
+   セキュリティ設定
+============================= */
 
-$pdo = new PDO(
-    "mysql:host=localhost;dbname=nyan_task;charset=utf8",
-    "root",
-    ""
-);
-$pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+ini_set('session.cookie_httponly', 1);
+ini_set('session.use_strict_mode', 1);
 
+session_start();
 
-/* ========= CRUD ========= */
+if (!isset($_SESSION['initiated'])) {
+    session_regenerate_id(true);
+    $_SESSION['initiated'] = true;
+}
+
+require __DIR__ . "/db.php";
+
+if (!isset($_SESSION['user_id'])) {
+    header("Location: login.php");
+    exit;
+}
+
+/* =============================
+   CSRFトークン生成
+============================= */
+
+if (empty($_SESSION['csrf_token'])) {
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+}
+
+/* =============================
+   CSRF検証
+============================= */
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (!hash_equals($_SESSION['csrf_token'], $_POST['csrf_token'] ?? '')) {
+        exit('不正なリクエストです');
+    }
+}
+
+/* =============================
+   CRUD処理
+============================= */
 
 // 追加
 if (isset($_POST['add'])) {
@@ -19,12 +50,14 @@ if (isset($_POST['add'])) {
 
     if ($task && $date) {
         $stmt = $pdo->prepare("
-            INSERT INTO tasks (task, task_date, is_done)
-            VALUES (:t, :d, 0)
+            INSERT INTO tasks (task, task_date, is_done, user_id)
+            VALUES (:t, :d, 0, :u)
         ");
+
         $stmt->execute([
             't' => $task,
-            'd' => $date
+            'd' => $date,
+            'u' => $_SESSION['user_id']
         ]);
     }
 
@@ -32,22 +65,23 @@ if (isset($_POST['add'])) {
     exit;
 }
 
-
 // 削除
 if (isset($_POST['delete'])) {
 
     $stmt = $pdo->prepare("
         DELETE FROM tasks
         WHERE id = :id
+        AND user_id = :uid
     ");
+
     $stmt->execute([
-        'id' => $_POST['delete']
+        'id'  => $_POST['delete'],
+        'uid' => $_SESSION['user_id']
     ]);
 
     header("Location: index.php");
     exit;
 }
-
 
 // 完了切替
 if (isset($_POST['toggle'])) {
@@ -56,38 +90,48 @@ if (isset($_POST['toggle'])) {
         UPDATE tasks
         SET is_done = NOT is_done
         WHERE id = :id
+        AND user_id = :uid
     ");
+
     $stmt->execute([
-        'id' => $_POST['toggle']
+        'id'  => $_POST['toggle'],
+        'uid' => $_SESSION['user_id']
     ]);
 
     header("Location: index.php");
     exit;
 }
-
 
 // 更新
 if (isset($_POST['update'])) {
 
-    $stmt = $pdo->prepare("
-        UPDATE tasks
-        SET task = :t,
-            task_date = :d
-        WHERE id = :id
-    ");
+    $t = trim($_POST['edit_task']);
+    $d = $_POST['edit_date'];
 
-    $stmt->execute([
-        't'  => $_POST['edit_task'],
-        'd'  => $_POST['edit_date'],
-        'id' => $_POST['update']
-    ]);
+    if ($t && $d) {
+        $stmt = $pdo->prepare("
+            UPDATE tasks
+            SET task = :t,
+                task_date = :d
+            WHERE id = :id
+            AND user_id = :uid
+        ");
+
+        $stmt->execute([
+            't'   => $t,
+            'd'   => $d,
+            'id'  => $_POST['update'],
+            'uid' => $_SESSION['user_id']
+        ]);
+    }
 
     header("Location: index.php");
     exit;
 }
 
-
-/* ========= データ取得 ========= */
+/* =============================
+   データ取得
+============================= */
 
 $today = date('Y-m-d');
 
@@ -96,40 +140,51 @@ $stmt = $pdo->prepare("
     SELECT *
     FROM tasks
     WHERE task_date = :today
+    AND user_id = :uid
     ORDER BY is_done ASC
 ");
-$stmt->execute(['today' => $today]);
-$todayTasks = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+$stmt->execute([
+    'today' => $today,
+    'uid'   => $_SESSION['user_id']
+]);
+
+$todayTasks = $stmt->fetchAll();
 
 // 今日以外
 $stmt = $pdo->prepare("
     SELECT *
     FROM tasks
     WHERE task_date <> :today
+    AND user_id = :uid
     ORDER BY task_date ASC, is_done ASC
 ");
-$stmt->execute(['today' => $today]);
-$otherTasks = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// 表示用統合
+$stmt->execute([
+    'today' => $today,
+    'uid'   => $_SESSION['user_id']
+]);
+
+$otherTasks = $stmt->fetchAll();
+
 $tasks = array_merge($todayTasks, $otherTasks);
 
-
-/* ========= 今日の達成率 ========= */
+/* =============================
+   達成率
+============================= */
 
 $total = count($todayTasks);
 $done  = 0;
 
 foreach ($todayTasks as $t) {
-    if ($t['is_done']) {
-        $done++;
-    }
+    if ($t['is_done']) $done++;
 }
 
 $rate = $total ? round(($done / $total) * 100) : 0;
 
-
-/* ========= カレンダー ========= */
+/* =============================
+   カレンダー
+============================= */
 
 $year  = $_GET['year']  ?? date('Y');
 $month = $_GET['month'] ?? date('m');
@@ -142,41 +197,34 @@ $stmt = $pdo->prepare("
     SELECT *
     FROM tasks
     WHERE YEAR(task_date) = :y
-      AND MONTH(task_date) = :m
+    AND MONTH(task_date) = :m
+    AND user_id = :uid
 ");
+
 $stmt->execute([
-    'y' => $year,
-    'm' => $month
+    'y'   => $year,
+    'm'   => $month,
+    'uid' => $_SESSION['user_id']
 ]);
 
-$calTasks = $stmt->fetchAll(PDO::FETCH_ASSOC);
+$calTasks = $stmt->fetchAll();
 
 $taskMap = [];
-
 foreach ($calTasks as $t) {
     $taskMap[$t['task_date']][] = $t;
 }
 
 $edit_id = $_GET['edit'] ?? null;
 
-
-/* ========= 月移動計算 ========= */
-
 $prevMonth = $month - 1;
 $prevYear  = $year;
 $nextMonth = $month + 1;
 $nextYear  = $year;
 
-if ($prevMonth < 1) {
-    $prevMonth = 12;
-    $prevYear--;
-}
-
-if ($nextMonth > 12) {
-    $nextMonth = 1;
-    $nextYear++;
-}
+if ($prevMonth < 1) { $prevMonth = 12; $prevYear--; }
+if ($nextMonth > 12) { $nextMonth = 1; $nextYear++; }
 ?>
+
 <!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -309,6 +357,14 @@ li{
 
 <body>
 <div class="wrapper">
+
+<div style="text-align:right; margin-bottom:10px;">
+    👤 <?= htmlspecialchars($_SESSION['username']) ?>
+    |
+    <form method="POST" action="logout.php" style="display:inline;">
+    <button type="submit">ログアウト</button>
+</form>
+</div>
 
 <!-- 左：タスク -->
 <div class="left">
