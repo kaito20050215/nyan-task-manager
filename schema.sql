@@ -1,9 +1,15 @@
 -- =========================================
 -- データベース：nyan_task
--- 途中段階でもアプリを動かせる SQL
+-- にゃんタスク管理アプリ用 SQL
 -- =========================================
 
--- 1. ユーザー管理テーブル
+-- データベース作成
+CREATE DATABASE IF NOT EXISTS nyan_task;
+USE nyan_task;
+
+-- =========================================
+-- users テーブル
+-- =========================================
 CREATE TABLE IF NOT EXISTS users (
     id INT AUTO_INCREMENT PRIMARY KEY,
     username VARCHAR(50) UNIQUE NOT NULL,
@@ -11,12 +17,13 @@ CREATE TABLE IF NOT EXISTS users (
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
--- サンプルユーザー
+-- デモユーザー
 INSERT INTO users (username, password) VALUES
-('user1', 'password123'),   -- 実際はハッシュ化推奨
-('testuser', 'password123');
+('demo', '$2y$10$examplehashxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx');
 
--- 2. タスクテーブル
+-- =========================================
+-- tasks テーブル
+-- =========================================
 CREATE TABLE IF NOT EXISTS tasks (
     id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT NOT NULL,
@@ -24,21 +31,14 @@ CREATE TABLE IF NOT EXISTS tasks (
     task_date DATE,
     is_done TINYINT(1) DEFAULT 0,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+
+    FOREIGN KEY (user_id)
+        REFERENCES users(id)
+        ON DELETE CASCADE
 );
 
 -- サンプルタスク
-INSERT INTO tasks (user_id, task, done) VALUES
-(1, 'テストタスク', 0),
-(1, 'タスクA', 1),
-(2, 'サンプルタスク', 0);
-
--- 3. もしカレンダーや達成率用テーブルが必要なら追加
--- 例：タスク進捗を日付ごとに管理
-CREATE TABLE IF NOT EXISTS task_progress (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    task_id INT NOT NULL,
-    progress_date DATE NOT NULL,
-    progress_value TINYINT(3) DEFAULT 0,
-    FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE
-);
+INSERT INTO tasks (user_id, task, task_date, is_done) VALUES
+(1, 'テストタスク', '2026-03-09', 0),
+(1, '買い物に行く', '2026-03-10', 0),
+(1, 'PHPの勉強', '2026-03-11', 1);

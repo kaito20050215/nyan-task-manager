@@ -8,6 +8,10 @@ ini_set('session.use_strict_mode', 1);
 
 session_start();
 
+if (!isset($_SESSION['csrf_token'])) {
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+}
+
 if (!isset($_SESSION['initiated'])) {
     session_regenerate_id(true);
     $_SESSION['initiated'] = true;
@@ -19,6 +23,12 @@ if (!isset($_SESSION['user_id'])) {
     header("Location: login.php");
     exit;
 }
+
+/* =============================
+   検索
+============================= */
+
+$keyword = $_GET['keyword'] ?? '';
 
 /* =============================
    CSRFトークン生成
@@ -132,6 +142,13 @@ if (isset($_POST['update'])) {
 /* =============================
    データ取得
 ============================= */
+$sort = $_GET['sort'] ?? 'date';
+
+if ($sort === "done") {
+    $order = "is_done ASC";
+} else {
+    $order = "task_date ASC";
+}
 
 $today = date('Y-m-d');
 
@@ -141,28 +158,32 @@ $stmt = $pdo->prepare("
     FROM tasks
     WHERE task_date = :today
     AND user_id = :uid
-    ORDER BY is_done ASC
-");
+    AND task LIKE :keyword
+    ORDER BY $order
+"); 
 
 $stmt->execute([
     'today' => $today,
-    'uid'   => $_SESSION['user_id']
+    'uid'   => $_SESSION['user_id'] ,
+    'keyword' => "%$keyword%"
 ]);
 
 $todayTasks = $stmt->fetchAll();
 
 // 今日以外
 $stmt = $pdo->prepare("
-    SELECT *
+   SELECT *
     FROM tasks
     WHERE task_date <> :today
     AND user_id = :uid
-    ORDER BY task_date ASC, is_done ASC
+    AND task LIKE :keyword
+    ORDER BY $order
 ");
 
 $stmt->execute([
     'today' => $today,
-    'uid'   => $_SESSION['user_id']
+    'uid'   => $_SESSION['user_id'],
+    'keyword' => "%$keyword%"
 ]);
 
 $otherTasks = $stmt->fetchAll();
@@ -394,6 +415,23 @@ li{
 
 <h1>🐾 今日のタスク</h1>
 
+<form method="GET" style="margin-bottom:10px;">
+<input type="text" name="keyword"
+       placeholder="タスク検索"
+       value="<?= htmlspecialchars($keyword) ?>">
+
+<button type="submit">検索</button>
+
+<div style="margin-bottom:10px;">
+<a href="?sort=date">📅 日付順</a> |
+<a href="?sort=done">✔ 未完了優先</a>
+</div>
+
+<a href="index.php">
+<button type="button">リセット</button>
+</a>
+</form>
+
 <p>達成率：<?= $rate ?>%</p>
 
 <div class="progress-bar">
@@ -440,19 +478,21 @@ li{
 
     <div>
         <form method="POST" style="display:inline;">
+            <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?>">
             <button name="toggle"
-                    value="<?= $task['id'] ?>"
-                    class="toggle-btn">✔</button>
-        </form>
+                value="<?= $task['id'] ?>"
+                class="toggle-btn">✔</button>
+            </form>
 
         <a href="?edit=<?= $task['id'] ?>">
             <button type="button" class="edit-btn">✏</button>
         </a>
 
         <form method="POST" style="display:inline;">
+            <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?>">
             <button name="delete"
-                    value="<?= $task['id'] ?>"
-                    class="delete-btn">🗑</button>
+                value="<?= $task['id'] ?>"
+                class="delete-btn">🗑</button>
         </form>
     </div>
 

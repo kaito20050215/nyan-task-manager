@@ -8,9 +8,16 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
     $username = trim($_POST['username']);
     $password = $_POST['password'];
+    $password_confirm = $_POST['password_confirm'];
 
-    if (!$username || !$password) {
+    if (!$username || !$password || !$password_confirm) {
+
         $error = "未入力の項目があります";
+
+    } elseif ($password !== $password_confirm) {
+
+        $error = "パスワードが一致しません";
+
     } else {
 
         // 既に存在するか確認
@@ -20,7 +27,9 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         $stmt->execute(['u' => $username]);
 
         if ($stmt->fetch()) {
+
             $error = "そのユーザー名は既に使われています";
+
         } else {
 
             $stmt = $pdo->prepare("
@@ -96,6 +105,7 @@ button{
 <form method="POST">
 <input type="text" name="username" placeholder="ユーザー名" required>
 <input type="password" name="password" placeholder="パスワード" required>
+<input type="password" name="password_confirm" placeholder="パスワード確認" required>
 <button type="submit">登録</button>
 </form>
 

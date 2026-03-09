@@ -122,6 +122,8 @@ button:hover{
 
 <button type="submit">ログイン</button>
 
+<a href="register.php">新規登録</a>
+
 </form>
 
 <?php if($error): ?>
