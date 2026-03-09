@@ -229,6 +229,8 @@ if ($nextMonth > 12) { $nextMonth = 1; $nextYear++; }
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" 
+      content="width=device-width, initial-scale=1.0">
 <title>にゃんタスク管理</title>
 
 <style>
@@ -352,6 +354,27 @@ li{
     height:100%;
     transition:0.3s;
 }
+/* スマートフォンの時 */
+@media (max-width: 767px) {
+    .left {
+        width: 100%;  /* 横幅いっぱい使う */
+    }
+    
+    .right {
+        width: 100%;  /* 横幅いっぱい使う */
+    }
+}
+
+/* パソコンの時 */
+@media (min-width: 1024px) {
+    .left {
+        width: 45%;   /* 左に45% */
+    }
+    
+    .right {
+        width: 55%;   /* 右に55% */
+    }
+}
 </style>
 </head>
 
@@ -378,6 +401,8 @@ li{
 </div>
 
 <form method="POST">
+    <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?>">
+    
     <input type="text" name="task" required>
     <input type="date" name="task_date" value="<?= $today ?>" required><br>
     <button type="submit" name="add" class="add-btn">追加</button>

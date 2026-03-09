@@ -1,0 +1,14 @@
+# 環境変数ファイル（パスワードが入ってるから隠す）
+.env
+
+# OS ファイル（不要なファイルを隠す）
+.DS_Store
+Thumbs.db
+
+# IDE ファイル（開発ツールのファイルを隠す）
+.vscode/
+.idea/
+
+# その他
+node_modules/
+*.log
